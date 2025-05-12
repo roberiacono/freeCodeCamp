@@ -9,6 +9,7 @@ import { bindActionCreators, Dispatch } from 'redux';
 import store from 'store';
 import { editor } from 'monaco-editor';
 import type { FitAddon } from 'xterm-addon-fit';
+import isEqual from 'lodash/isEqual';
 
 import { useFeature } from '@growthbook/growthbook-react';
 import { challengeTypes } from '../../../../../shared/config/challenge-types';
@@ -387,6 +388,36 @@ function ShowClassic({
     challengeMounted(challengeMeta.id);
     setIsAdvancing(false);
   };
+
+  // Show leave page confirmation if code is not saved
+  useEffect(() => {
+    console.log('savedChallenges', savedChallenges);
+    console.log('challengeFiles', challengeFiles);
+
+    const savedChallengeFiles = savedChallenges[0]?.challengeFiles;
+    console.log('savedChallengeFiles', savedChallengeFiles);
+    //if(!savedChallengeFiles) return
+
+    const savedContents = savedChallengeFiles?.map(file => file.contents);
+    const currentContents = challengeFiles?.map(file => file.contents);
+
+    console.log('savedContents', savedContents);
+    console.log('currentContents', currentContents);
+
+    const isSaved =
+      savedChallengeFiles && isEqual(savedContents, currentContents);
+
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      return '';
+    }
+
+    if (!isSaved) window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [savedChallenges, challengeFiles]);
 
   const renderInstructionsPanel = ({
     toolPanel,
