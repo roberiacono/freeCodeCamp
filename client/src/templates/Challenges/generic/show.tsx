@@ -3,8 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
 import { connect } from 'react-redux';
-import { Container, Col, Row, Button, Spacer } from '@freecodecamp/ui';
-import { isEqual } from 'lodash';
+import { Container, Col, Row, Button, useQuiz, Spacer } from '@freecodecamp/ui';
 import store from 'store';
 import { YouTubeEvent } from 'react-youtube';
 
@@ -34,9 +33,12 @@ import ChallengeTranscript from '../components/challenge-transcript';
 import HelpModal from '../components/help-modal';
 import { SceneSubject } from '../components/scene/scene-subject';
 
+import { shuffleArray } from '../../../../../shared/utils/shuffle-array';
+
 // Styles
 import './show.css';
 import '../video.css';
+import PrismFormatted from '../components/prism-formatted';
 
 // Redux Setup
 const mapStateToProps = (state: unknown) => ({
@@ -103,6 +105,7 @@ const ShowGeneric = ({
 }: ShowQuizProps) => {
   const { t } = useTranslation();
   const container = useRef<HTMLElement | null>(null);
+  const [hasSubmitted, setHasSubmitted] = useState<boolean>(false);
 
   const blockNameTitle = `${t(
     `intro:${superBlock}.blocks.${block}.title`
@@ -151,49 +154,50 @@ const ShowGeneric = ({
     setAssignmentsCompleted(a => (isCompleted ? a + 1 : a - 1));
   };
 
-  // multiple choice questions
-  const [selectedMcqOptions, setSelectedMcqOptions] = useState(
-    questions.map<number | null>(() => null)
-  );
-  const [submittedMcqAnswers, setSubmittedMcqAnswers] = useState(
-    questions.map<number | null>(() => null)
-  );
-
-  const [hasAnsweredMcqCorrectly, sethasAnsweredMcqCorrectly] = useState(true);
-
-  const [showFeedback, setShowFeedback] = useState(false);
-
-  const handleMcqOptionChange = (
-    questionIndex: number,
-    answerIndex: number
-  ): void => {
-    setSelectedMcqOptions(prev =>
-      prev.map((option, index) =>
-        index === questionIndex ? answerIndex : option
-      )
-    );
-  };
-
   const handleSubmit = () => {
-    const hasCompletedAssignments =
-      assignments.length === 0 || allAssignmentsCompleted;
-    const mcqSolutions = questions.map(question => question.solution - 1);
-    const mcqCorrect = isEqual(mcqSolutions, selectedMcqOptions);
-
-    setSubmittedMcqAnswers(selectedMcqOptions);
-    setShowFeedback(true);
-    if (hasCompletedAssignments && mcqCorrect) {
-      openCompletionModal();
-    }
-
-    if (mcqSolutions.length > selectedMcqOptions.length || !mcqCorrect) {
-      sethasAnsweredMcqCorrectly(false);
-    } else {
-      sethasAnsweredMcqCorrectly(true);
-    }
+    validateAnswers();
   };
 
   const sceneSubject = new SceneSubject();
+
+  console.log('questions', questions);
+
+  // Initialize the data passed to `useQuiz`
+
+  const [initialQuizData] = useState(
+    questions.map(question => {
+      // Map all answers to the label/value shape
+      const answers = question.answers.map((ans, index) => ({
+        label: (
+          <PrismFormatted className='quiz-answer-label' text={ans.answer} />
+        ),
+        value: index + 1 // values start at 1
+      }));
+
+      // The correct answer is at question.solution (1-based index)
+      const correctAnswerValue = question.solution;
+
+      return {
+        question: <PrismFormatted text={question.text} />,
+        answers: shuffleArray(answers),
+        correctAnswer: correctAnswerValue
+      };
+    })
+  );
+
+  const { questions: quizData, validateAnswers } = useQuiz({
+    initialQuestions: initialQuizData,
+    validationMessages: {
+      correct: t('learn.quiz.correct-answer'),
+      incorrect: t('learn.quiz.incorrect-answer')
+    },
+    passingPercent: 100,
+    onSuccess: () => {
+      openCompletionModal();
+      setHasSubmitted(true);
+    },
+    onFailure: () => setHasSubmitted(false)
+  });
 
   return (
     <Hotkeys
@@ -268,21 +272,14 @@ const ShowGeneric = ({
 
               {questions.length > 0 && (
                 <MultipleChoiceQuestions
-                  questions={questions}
-                  selectedOptions={selectedMcqOptions}
-                  handleOptionChange={handleMcqOptionChange}
-                  submittedMcqAnswers={submittedMcqAnswers}
-                  showFeedback={showFeedback}
+                  questions={quizData}
+                  disabled={hasSubmitted}
                 />
               )}
 
               {explanation ? (
                 <ChallengeExplanation explanation={explanation} />
               ) : null}
-
-              {!hasAnsweredMcqCorrectly && (
-                <p className='text-center'>{t('learn.answered-mcq')}</p>
-              )}
 
               <Button block={true} variant='primary' onClick={handleSubmit}>
                 {blockType === BlockTypes.review
