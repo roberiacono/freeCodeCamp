@@ -160,10 +160,6 @@ const ShowGeneric = ({
 
   const sceneSubject = new SceneSubject();
 
-  function removeParagraphTags(text: string): string {
-    return text.replace(/^<p>|<\/p>$/g, '');
-  }
-
   // Initialize the data passed to `useQuiz`
   const [initialQuizData] = useState(
     questions.map(question => {
@@ -176,12 +172,15 @@ const ShowGeneric = ({
           label: (
             <PrismFormatted
               className='quiz-answer-label'
-              text={removeParagraphTags(answer.answer)}
+              text={answer.answer}
             />
           ),
           value: index + 1, // distractors get values starting from 1
           feedback: (
-            <PrismFormatted text={removeParagraphTags(answer.feedback || '')} />
+            <PrismFormatted
+              className='quiz-feedback-label'
+              text={answer.feedback || ''}
+            />
           )
         }));
 
@@ -189,14 +188,19 @@ const ShowGeneric = ({
         label: (
           <PrismFormatted
             className='quiz-answer-label'
-            text={removeParagraphTags(question.answers[answerIndex].answer)}
+            text={question.answers[answerIndex].answer}
           />
         ),
         value: distractors.length + 1 // correct answer value is after distractors
       };
 
       return {
-        question: <PrismFormatted text={removeParagraphTags(question.text)} />,
+        question: (
+          <PrismFormatted
+            className='quiz-question-label'
+            text={question.text}
+          />
+        ),
         answers: shuffleArray([...distractors, answer]),
         correctAnswer: answer.value
       };
